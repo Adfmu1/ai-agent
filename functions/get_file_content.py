@@ -1,3 +1,4 @@
+from google.genai import types
 import os
 from .config import MAX_CHARS
 
@@ -25,3 +26,17 @@ def get_file_content(working_directory, file_path):
     except Exception as e:
         return f"Error getting file content: {e}"
                 
+                
+schema_get_files_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Get contents of a file, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="Is a relative path to the file from working directory. The limit for file content is 10000 characters. If its surpassed, the string containing that information is concatenated to the content.",
+            ),
+        },
+    ),
+)
