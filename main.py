@@ -3,7 +3,7 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from call_function import available_functions
+from call_function import available_functions, call_function
 
 system_prompt = """
 You are a helpful AI coding agent.
@@ -47,7 +47,8 @@ def main():
 
                 print(response.text)
                 if response.function_calls != None:
-                    print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
+                    function_call_result = call_function(response.function_calls[0], True)
+
                     
 
                 print("Prompt tokens:", response.usage_metadata.prompt_token_count)
@@ -62,7 +63,13 @@ def main():
             
             print(response.text)
             if response.function_calls != None:
-                print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
+                function_call_result = call_function(response.function_calls[0])
+            
+        if function_call_result.parts[0].function_response.response == None:
+            raise Exception("Bad content")
+        else:
+            if "--verbose" in sys.argv:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
             
             
     else:
