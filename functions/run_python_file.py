@@ -1,6 +1,5 @@
 from google.genai import types
-import os
-import subprocess
+import os, subprocess
 
 def run_python_file(working_directory, file_path, args=[]):
     f_path = os.path.abspath(os.path.join(working_directory, file_path))
@@ -22,7 +21,7 @@ def run_python_file(working_directory, file_path, args=[]):
     
 schema_run_python_file = types.FunctionDeclaration(
     name="run_python_file",
-    description="Run a python file and return STDOUT and STDERR, along with the exit code if its different than 0, constrained to the working directory.",
+    description="Execute (run) a python file and return an output, constrained to the working directory. The args is not required.",
     parameters=types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -32,8 +31,15 @@ schema_run_python_file = types.FunctionDeclaration(
             ),
             "args": types.Schema(
                 type=types.Type.ARRAY,
-                description="Additional arguments that can be passed to a python file if necessary. Doesnt need to be passed if empty."
+                items=types.Schema(
+                    type=types.Type.STRING,
+                    description="Optional arguments that can be passed to a python file. If arguments not specified, omit the property."
+
+                ),
+                description="Optional arguments that can be passed to a python file. If arguments not specified, omit the property."
             ),
         },
+        required=["file_path"],
+        
     ),
 )
