@@ -18,63 +18,85 @@ When a user asks a question or makes a request, make a function call plan. You c
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
 
-config = types.GenerateContentConfig(
-    tools=[available_functions], system_instruction=system_prompt
-)
-
 def main():
-    if len(sys.argv) > 1:
-        prompt = sys.argv[1]
+    verbose = False
+    if "--verbose" in sys.argv:
+        verbose = True
         
-        load_dotenv()
-        api_key = os.environ.get("GEMINI_API_KEY")
-
-        client = genai.Client(api_key=api_key)
-        
-        messages = [
-                types.Content(role="user", parts=[types.Part(text=prompt)])
-        ]
-    
-        if "--verbose" in sys.argv:
-            for prompt in messages:
-                print("User prompt:", prompt)
-                
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash-001", 
-                    contents=prompt,
-                    config=config
-                    )
-
-                print(response.text)
-                if response.function_calls != None:
-                    function_call_result = call_function(response.function_calls[0], True)
-
-                    
-
-                print("Prompt tokens:", response.usage_metadata.prompt_token_count)
-                print("Response tokens:", response.usage_metadata.candidates_token_count)
-        else:
-
-            response = client.models.generate_content(
-                model="gemini-2.0-flash-001", 
-                contents=messages,
-                config=config
-                )
-            
-            print(response.text)
-            if response.function_calls != None:
-                function_call_result = call_function(response.function_calls[0])
-            
-        if function_call_result.parts[0].function_response.response == None:
-            raise Exception("Bad content")
-        else:
-            if "--verbose" in sys.argv:
-                print(f"-> {function_call_result.parts[0].function_response.response}")
-            
-            
-    else:
+    if len(sys.argv) == 1 and verbose:
         print("no prompt provided")
         sys.exit(1)
+        
+    for arg in sys.argv:
+        if not arg == "--verbose":
+            prompt = arg
+    
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key)
+    
+    if verbose:
+        print(f"User prompt: {prompt}")
+        
+    messages = [
+            types.Content(role="user", parts=[types.Part(text=prompt)])
+    ]
+    
+    for i in range(20):
+        try:
+            final_response = generate_content(client, messages, verbose)
+            
+            if final_response:
+                print("Final response:\n", final_response)
+                break
+            
+        except Exception as e:
+            print(f"Error: {e}")
+
+        
+def generate_content(client, messages, verbose):
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-001", 
+        contents=messages,
+        config=types.GenerateContentConfig(
+                tools=[available_functions], system_instruction=system_prompt
+            )
+        )
+    
+    
+    if verbose:
+        print("Prompt tokens:", response.usage_metadata.prompt_token_count)
+        print("Response tokens:", response.usage_metadata.candidates_token_count)
+        
+    if response.candidates:
+        for candidate in response.candidates:
+            function_call_content = candidate.content
+            messages.append(function_call_content)        
+
+    if not response.function_calls:
+        return response.text
+    
+    func_responses = []
+
+    for function_call_part in response.function_calls:
+        function_call_result = call_function(function_call_part, verbose)
+
+        if not function_call_result.parts or not function_call_result.parts[0].function_response:
+            raise Exception("empty function call result")
+
+        if "--verbose" in sys.argv:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+        
+        func_responses.append(function_call_result.parts[0])
+            
+    if not func_responses:
+        raise Exception("no function responses generated, exiting")
+
+    messages.append(types.Content(role="user", parts=func_responses))
+
+            
+    
+    
 
 if __name__ == "__main__":
     main()
